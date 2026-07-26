@@ -15,12 +15,21 @@ def remover_acentos(texto):
     texto_normalizado = unicodedata.normalize('NFD', texto)
     return ''.join(c for c in texto_normalizado if unicodedata.category(c) != 'Mn')
 
-REGIOES_BR = {
-    'Norte': ['acre', 'amapa', 'amazonas', 'para', 'rondonia', 'roraima', 'tocantins'],
-    'Nordeste': ['alagoas', 'bahia', 'ceara', 'maranhao', 'paraiba', 'pernambuco', 'piaui', 'rio grande do norte', 'sergipe'],
-    'Centro-Oeste': ['goias', 'mato grosso', 'mato grosso do sul', 'distrito federal'],
-    'Sudeste': ['espirito santo', 'minas gerais', 'rio de janeiro', 'sao paulo'],
-    'Sul': ['parana', 'rio grande do sul', 'santa catarina']
+# DICIONÁRIOS ROBUSTOS PARA NUNCA MAIS PERDER UMA CIDADE
+ESTADOS_BR = {
+    'Norte': ['acre', 'ac', 'amapa', 'ap', 'amazonas', 'am', 'para', 'pa', 'rondonia', 'ro', 'roraima', 'rr', 'tocantins', 'to'],
+    'Nordeste': ['alagoas', 'al', 'bahia', 'ba', 'ceara', 'ce', 'maranhao', 'ma', 'paraiba', 'pb', 'pernambuco', 'pe', 'piaui', 'pi', 'rio grande do norte', 'rn', 'sergipe', 'se'],
+    'Centro-Oeste': ['goias', 'go', 'mato grosso', 'mt', 'mato grosso do sul', 'ms', 'distrito federal', 'df'],
+    'Sudeste': ['espirito santo', 'es', 'minas gerais', 'mg', 'rio de janeiro', 'rj', 'sao paulo', 'sp'],
+    'Sul': ['parana', 'pr', 'rio grande do sul', 'rs', 'santa catarina', 'sc']
+}
+
+CAPITAIS = {
+    'Norte': ['rio branco', 'macapa', 'manaus', 'belem', 'porto velho', 'boa vista', 'palmas'],
+    'Nordeste': ['maceio', 'salvador', 'fortaleza', 'sao luis', 'joao pessoa', 'recife', 'teresina', 'natal', 'aracaju'],
+    'Centro-Oeste': ['goiania', 'cuiaba', 'campo grande', 'brasilia'],
+    'Sudeste': ['vitoria', 'belo horizonte', 'rio de janeiro', 'sao paulo'],
+    'Sul': ['curitiba', 'porto alegre', 'florianopolis']
 }
 
 def get_instagram_data():
@@ -37,63 +46,76 @@ def get_instagram_data():
         'Impressoes_30d': 0, 'Taxa_Engajamento_%': 0, 'Media_Alcance_Post': 0
     }
 
-    # 1. Seguidores Totais
     try:
         req_seguidores = requests.get(f"{base_url}/{IG_ID}?fields=followers_count&access_token={META_TOKEN}").json()
         dados_finais['Seguidores'] = req_seguidores.get('followers_count', 0)
     except: pass
 
-    # 2. Crescimento (Soma dos ganhos diários)
     try:
         req_hist = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_count&period=day&since={unix_30_dias}&until={unix_hoje}&access_token={META_TOKEN}").json()
         if 'data' in req_hist and len(req_hist['data']) > 0:
             dados_finais['Crescimento_30d'] = sum(v['value'] for v in req_hist['data'][0]['values'])
     except: pass
 
-    # 3. Demografia: Gênero
+    # MATEMÁTICA CORRIGIDA (GÊNEROS)
     try:
         req_demo_gender = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&timeframe=last_30_days&breakdown=gender&access_token={META_TOKEN}").json()
         if 'data' in req_demo_gender and req_demo_gender['data']:
             results = req_demo_gender['data'][0]['total_value']['breakdowns'][0]['results']
-            total_genero = sum(r['value'] for r in results)
             mulheres = sum(r['value'] for r in results if r['dimension_values'][0] == 'F')
             homens = sum(r['value'] for r in results if r['dimension_values'][0] == 'M')
+            total_genero = mulheres + homens # A Meta ignora o "Indefinido", nós também
             dados_finais['%_Mulheres'] = round((mulheres / total_genero) * 100, 2) if total_genero else 0
             dados_finais['%_Homens'] = round((homens / total_genero) * 100, 2) if total_genero else 0
     except: pass
 
-    # 4. Demografia: Cidades / Regiões
+    # MATEMÁTICA CORRIGIDA (REGIÕES E CIDADES)
     try:
         req_demo_city = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&timeframe=last_30_days&breakdown=city&access_token={META_TOKEN}").json()
         if 'data' in req_demo_city and req_demo_city['data']:
             results = req_demo_city['data'][0]['total_value']['breakdowns'][0]['results']
             cidades = {r['dimension_values'][0]: r['value'] for r in results}
-            total_cidades = sum(cidades.values())
-            contagem_regioes = {'Norte': 0, 'Nordeste': 0, 'Centro-Oeste': 0, 'Sudeste': 0, 'Sul': 0, 'Outros': 0}
+            
+            contagem_regioes = {'Norte': 0, 'Nordeste': 0, 'Centro-Oeste': 0, 'Sudeste': 0, 'Sul': 0}
+            
             for cidade_string, quantidade in cidades.items():
-                partes = cidade_string.split(', ')
-                if len(partes) > 1:
-                    estado_limpo = remover_acentos(partes[1].lower().strip())
-                    regiao_encontrada = 'Outros'
-                    for regiao, estados in REGIOES_BR.items():
-                        if estado_limpo in estados:
+                partes = [remover_acentos(p.lower().strip()) for p in cidade_string.split(',')]
+                cidade_nome = partes[0]
+                estado_nome = partes[1] if len(partes) > 1 else ''
+                
+                regiao_encontrada = None
+                for regiao, estados in ESTADOS_BR.items():
+                    if estado_nome in estados or cidade_nome in estados:
+                        regiao_encontrada = regiao
+                        break
+                
+                if not regiao_encontrada:
+                    for regiao, caps in CAPITAIS.items():
+                        if cidade_nome in caps:
                             regiao_encontrada = regiao
                             break
+                            
+                if regiao_encontrada:
                     contagem_regioes[regiao_encontrada] += quantidade
-                else:
-                    contagem_regioes['Outros'] += quantidade
+
+            # Calculando porcentagem baseada no número real de seguidores (Exato da Meta Business)
+            total_seguidores = dados_finais['Seguidores']
+            soma_conhecidos = sum(contagem_regioes.values())
+            
             for regiao, qtd in contagem_regioes.items():
-                dados_finais[f'%_{regiao}'] = round((qtd / total_cidades) * 100, 2) if total_cidades else 0
+                dados_finais[f'%_{regiao}'] = round((qtd / total_seguidores) * 100, 2) if total_seguidores else 0
+                
+            # Tudo que sobrou (cidades menores que o Insta esconde + exterior) vai para Outros
+            outros_qtd = total_seguidores - soma_conhecidos
+            dados_finais['%_Outros'] = round((outros_qtd / total_seguidores) * 100, 2) if total_seguidores else 0
     except: pass
 
-    # 5. Impressões (Agora usando 'reach')
     try:
         req_impressoes = requests.get(f"{base_url}/{IG_ID}/insights?metric=reach&period=day&since={unix_30_dias}&until={unix_hoje}&access_token={META_TOKEN}").json()
         if 'data' in req_impressoes:
             dados_finais['Impressoes_30d'] = sum(v['value'] for item in req_impressoes['data'] for v in item.get('values', []))
     except: pass
 
-    # 6. Mídia (Alcance e Engajamento)
     try:
         req_media = requests.get(f"{base_url}/{IG_ID}/media?fields=like_count,comments_count,insights.metric(reach)&limit=30&access_token={META_TOKEN}").json()
         if 'data' in req_media:
