@@ -93,7 +93,7 @@ def get_instagram_data():
             dados_finais['Impressoes_30d'] = sum(v['value'] for item in req_impressoes['data'] for v in item.get('values', []))
     except: pass
 
-    # 6. Mídia (Alcance e Engajamento Corrigidos)
+    # 6. Mídia (Alcance e Engajamento)
     try:
         req_media = requests.get(f"{base_url}/{IG_ID}/media?fields=like_count,comments_count,insights.metric(reach)&limit=30&access_token={META_TOKEN}").json()
         if 'data' in req_media:
