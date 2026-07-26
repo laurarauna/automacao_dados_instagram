@@ -1,0 +1,34 @@
+name: Extracao Midia Kit Mensal
+
+# Agendamento: Roda à meia-noite do dia 1º de todo mês
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  # Permite que você clique em um botão para testar agora mesmo
+  workflow_dispatch: 
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Baixar o código do repositório
+      uses: actions/checkout@v3
+
+    - name: Configurar o Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Instalar bibliotecas
+      run: |
+        pip install -r requirements.txt
+
+    - name: Rodar o script de extração
+      env:
+        META_TOKEN: ${{ secrets.META_TOKEN }}
+        IG_ID: ${{ secrets.IG_ID }}
+        SHEET_ID: ${{ secrets.SHEET_ID }}
+        GOOGLE_JSON: ${{ secrets.GOOGLE_JSON }}
+      run: |
+        python main.py
