@@ -2,14 +2,29 @@ import os
 import json
 import requests
 import gspread
+import unicodedata
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime, timedelta
 
-# Variáveis de Ambiente (Vamos configurar isso no Render depois)
+# Variáveis de Ambiente
 META_TOKEN = os.environ.get("META_TOKEN")
 IG_ID = os.environ.get("IG_ID")
 SHEET_ID = os.environ.get("SHEET_ID")
 GOOGLE_JSON_STR = os.environ.get("GOOGLE_JSON")
+
+# Função para limpar acentos (Ex: "Goiás" vira "goias")
+def remover_acentos(texto):
+    texto_normalizado = unicodedata.normalize('NFD', texto)
+    return ''.join(c for c in texto_normalizado if unicodedata.category(c) != 'Mn')
+
+# Mapeamento oficial das regiões do Brasil
+REGIOES_BR = {
+    'Norte': ['acre', 'amapa', 'amazonas', 'para', 'rondonia', 'roraima', 'tocantins'],
+    'Nordeste': ['alagoas', 'bahia', 'ceara', 'maranhao', 'paraiba', 'pernambuco', 'piaui', 'rio grande do norte', 'sergipe'],
+    'Centro-Oeste': ['goias', 'mato grosso', 'mato grosso do sul', 'distrito federal'],
+    'Sudeste': ['espirito santo', 'minas gerais', 'rio de janeiro', 'sao paulo'],
+    'Sul': ['parana', 'rio grande do sul', 'santa catarina']
+}
 
 def get_instagram_data():
     base_url = "https://graph.facebook.com/v19.0"
@@ -40,18 +55,38 @@ def get_instagram_data():
         
         elif insight['name'] == 'audience_gender_age':
             demografia = insight['values'][0]['value']
-            total = sum(demografia.values())
+            total_genero = sum(demografia.values())
             mulheres = sum(v for k, v in demografia.items() if k.startswith('F'))
             homens = sum(v for k, v in demografia.items() if k.startswith('M'))
-            dados_finais['%_Mulheres'] = round((mulheres / total) * 100, 2) if total else 0
-            dados_finais['%_Homens'] = round((homens / total) * 100, 2) if total else 0
+            dados_finais['%_Mulheres'] = round((mulheres / total_genero) * 100, 2) if total_genero else 0
+            dados_finais['%_Homens'] = round((homens / total_genero) * 100, 2) if total_genero else 0
             
         elif insight['name'] == 'audience_city':
             cidades = insight['values'][0]['value']
             total_cidades = sum(cidades.values())
-            top_cidades = sorted(cidades.items(), key=lambda x: x[1], reverse=True)[:3]
-            cidades_str = ", ".join([f"{c[0].split(',')[0]} ({round((c[1]/total_cidades)*100, 1)}%)" for c in top_cidades])
-            dados_finais['Top_Cidades'] = cidades_str
+            
+            # Zerando os contadores de regiões
+            contagem_regioes = {'Norte': 0, 'Nordeste': 0, 'Centro-Oeste': 0, 'Sudeste': 0, 'Sul': 0, 'Outros': 0}
+            
+            for cidade_string, quantidade in cidades.items():
+                partes = cidade_string.split(', ')
+                if len(partes) > 1:
+                    estado_limpo = remover_acentos(partes[1].lower().strip())
+                    regiao_encontrada = 'Outros'
+                    
+                    # Procura o estado no nosso dicionário
+                    for regiao, estados in REGIOES_BR.items():
+                        if estado_limpo in estados:
+                            regiao_encontrada = regiao
+                            break
+                            
+                    contagem_regioes[regiao_encontrada] += quantidade
+                else:
+                    contagem_regioes['Outros'] += quantidade
+            
+            # Calculando a porcentagem final de cada região
+            for regiao, qtd in contagem_regioes.items():
+                dados_finais[f'%_{regiao}'] = round((qtd / total_cidades) * 100, 2) if total_cidades else 0
 
     # 3. Impressões (Últimos 30 dias)
     req_impressoes = requests.get(
@@ -99,7 +134,12 @@ def salvar_no_sheets(dados):
         dados.get('Crescimento_30d'),
         dados.get('%_Mulheres'),
         dados.get('%_Homens'),
-        dados.get('Top_Cidades'),
+        dados.get('%_Norte'),
+        dados.get('%_Nordeste'),
+        dados.get('%_Centro-Oeste'),
+        dados.get('%_Sudeste'),
+        dados.get('%_Sul'),
+        dados.get('%_Outros'),
         dados.get('Impressoes_30d'),
         dados.get('Taxa_Engajamento_%'),
         dados.get('Media_Alcance_Post')
