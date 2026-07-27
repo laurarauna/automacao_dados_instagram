@@ -19,8 +19,8 @@ def get_instagram_data():
 
     dados_finais = {
         'Data': hoje.strftime("%Y-%m-%d"), 'Seguidores': 0, 'Crescimento_30d': 0,
-        '%_Mulheres': 0, '%_Homens': 0, 'Top_5_Cidades': "N/A", 'Impressoes_30d': 0, 
-        'Media_Alcance_Post': 0, 'Media_Salvos_Post': 0, 
+        '%_Mulheres': 0, '%_Homens': 0, 'Faixa_Etaria': "N/A", 'Top_5_Cidades': "N/A", 
+        'Impressoes_30d': 0, 'Media_Alcance_Post': 0, 'Media_Salvos_Post': 0, 
         'Media_Compartilhamentos_Post': 0, 'Taxa_Engajamento_%': 0
     }
 
@@ -49,15 +49,35 @@ def get_instagram_data():
             dados_finais['%_Homens'] = round((homens / total_genero) * 100, 2) if total_genero else 0
     except: pass
 
-    # 4. Demografia: Top 5 Cidades (Ajuste Elegante)
+    # 4. Demografia: Faixa Etária (Top 3)
+    try:
+        req_demo_age = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&timeframe=last_30_days&breakdown=age&access_token={META_TOKEN}").json()
+        if 'data' in req_demo_age and req_demo_age['data']:
+            results = req_demo_age['data'][0]['total_value']['breakdowns'][0]['results']
+            
+            # Ordena as idades da maior para a menor quantidade
+            idades_ordenadas = sorted(results, key=lambda x: x['value'], reverse=True)
+            top_3 = idades_ordenadas[:3] # Pega apenas as 3 principais
+            
+            total_seguidores = dados_finais['Seguidores']
+            lista_strings_idades = []
+            
+            for i, idade in enumerate(top_3, 1):
+                faixa = idade['dimension_values'][0]
+                porcentagem = round((idade['value'] / total_seguidores) * 100, 2) if total_seguidores else 0
+                lista_strings_idades.append(f"{i}º {faixa} anos ({porcentagem}%)")
+                
+            dados_finais['Faixa_Etaria'] = " | ".join(lista_strings_idades)
+    except: pass
+
+    # 5. Demografia: Top 5 Cidades
     try:
         req_demo_city = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&timeframe=last_30_days&breakdown=city&access_token={META_TOKEN}").json()
         if 'data' in req_demo_city and req_demo_city['data']:
             results = req_demo_city['data'][0]['total_value']['breakdowns'][0]['results']
             
-            # Ordena as cidades da maior para a menor quantidade
             cidades_ordenadas = sorted(results, key=lambda x: x['value'], reverse=True)
-            top_5 = cidades_ordenadas[:5] # Pega apenas as 5 primeiras
+            top_5 = cidades_ordenadas[:5]
             
             total_seguidores = dados_finais['Seguidores']
             lista_strings_cidades = []
@@ -70,14 +90,14 @@ def get_instagram_data():
             dados_finais['Top_5_Cidades'] = " | ".join(lista_strings_cidades)
     except: pass
 
-    # 5. Impressões
+    # 6. Impressões
     try:
         req_impressoes = requests.get(f"{base_url}/{IG_ID}/insights?metric=reach&period=day&since={unix_30_dias}&until={unix_hoje}&access_token={META_TOKEN}").json()
         if 'data' in req_impressoes:
             dados_finais['Impressoes_30d'] = sum(v['value'] for item in req_impressoes['data'] for v in item.get('values', []))
     except: pass
 
-    # 6. Mídia (Adicionado Salvos e Compartilhamentos)
+    # 7. Mídia (Salvos e Compartilhamentos)
     try:
         req_media = requests.get(f"{base_url}/{IG_ID}/media?fields=like_count,comments_count,insights.metric(reach,saved,shares)&limit=30&access_token={META_TOKEN}").json()
         if 'data' in req_media:
@@ -119,8 +139,8 @@ def salvar_no_sheets(dados):
     
     linha = [
         dados.get('Data'), dados.get('Seguidores'), dados.get('Crescimento_30d'),
-        dados.get('%_Mulheres'), dados.get('%_Homens'), dados.get('Top_5_Cidades'),
-        dados.get('Impressoes_30d'), dados.get('Media_Alcance_Post'), 
+        dados.get('%_Mulheres'), dados.get('%_Homens'), dados.get('Faixa_Etaria'), 
+        dados.get('Top_5_Cidades'), dados.get('Impressoes_30d'), dados.get('Media_Alcance_Post'), 
         dados.get('Media_Salvos_Post'), dados.get('Media_Compartilhamentos_Post'), 
         dados.get('Taxa_Engajamento_%')
     ]
