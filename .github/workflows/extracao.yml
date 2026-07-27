@@ -1,9 +1,9 @@
 name: Extracao Midia Kit Mensal
 
-# Agendamento: Roda à meia-noite do dia 1º de todo mês
+# Agendamento: Roda no dia 1º de todo mês às 04:00 da manhã (Horário de Brasília)
 on:
   schedule:
-    - cron: '0 0 1 * *'
+    - cron: '0 7 1 * *' 
   # Permite que você clique em um botão para testar agora mesmo
   workflow_dispatch: 
 
