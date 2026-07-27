@@ -49,7 +49,7 @@ def get_instagram_data():
             dados_finais['%_Homens'] = round((homens / total_genero) * 100, 2) if total_genero else 0
     except: pass
 
-    # 4. Demografia: Faixa Etária (Top 3)
+    # 4. Demografia: Faixa Etária (TODAS AS FAIXAS)
     try:
         req_demo_age = requests.get(f"{base_url}/{IG_ID}/insights?metric=follower_demographics&period=lifetime&metric_type=total_value&timeframe=last_30_days&breakdown=age&access_token={META_TOKEN}").json()
         if 'data' in req_demo_age and req_demo_age['data']:
@@ -57,12 +57,12 @@ def get_instagram_data():
             
             # Ordena as idades da maior para a menor quantidade
             idades_ordenadas = sorted(results, key=lambda x: x['value'], reverse=True)
-            top_3 = idades_ordenadas[:3] # Pega apenas as 3 principais
             
             total_seguidores = dados_finais['Seguidores']
             lista_strings_idades = []
             
-            for i, idade in enumerate(top_3, 1):
+            # Varre todas as faixas retornadas pela Meta, sem limite
+            for i, idade in enumerate(idades_ordenadas, 1):
                 faixa = idade['dimension_values'][0]
                 porcentagem = round((idade['value'] / total_seguidores) * 100, 2) if total_seguidores else 0
                 lista_strings_idades.append(f"{i}º {faixa} anos ({porcentagem}%)")
