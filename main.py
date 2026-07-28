@@ -148,8 +148,15 @@ def salvar_no_sheets(dados):
     sheet.append_row(linha)
     print("Dados inseridos com sucesso!")
 
+def salvar_json(dados):
+    # Cria um arquivo JSON com os dados do mês
+    with open("dados_midia_kit.json", "w", encoding="utf-8") as arquivo:
+        json.dump(dados, arquivo, ensure_ascii=False, indent=4)
+    print("Arquivo JSON atualizado com sucesso!")
+
 if __name__ == "__main__":
     print("Iniciando extração do Mídia Kit...")
     metricas = get_instagram_data()
     print("Dados extraídos:", metricas)
     salvar_no_sheets(metricas)
+    salvar_json(metricas)
