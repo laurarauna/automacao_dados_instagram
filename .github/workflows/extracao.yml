@@ -39,7 +39,7 @@ jobs:
         API_TOKEN_GITHUB: ${{ secrets.PAT_TOKEN }}
       with:
         source_file: 'dados_midia_kit.json'
-        destination_repo: 'SEU_USUARIO_AQUI/casa_curadoria_art' # ⚠️ MUDE PARA O SEU USUÁRIO DO GITHUB
+        destination_repo: 'laurarauna/casa_curadoria_art'
         destination_folder: '/'
         user_email: 'casacuradorias@gmail.com'
         user_name: 'CasaCuradoria-Bot'
