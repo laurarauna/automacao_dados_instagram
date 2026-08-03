@@ -32,3 +32,15 @@ jobs:
         GOOGLE_JSON: ${{ secrets.GOOGLE_JSON }}
       run: |
         python main.py
+
+    - name: Enviar JSON para o repositório do Site
+      uses: dmnemec/copy_file_to_another_repo_action@main
+      env:
+        API_TOKEN_GITHUB: ${{ secrets.PAT_TOKEN }}
+      with:
+        source_file: 'dados_midia_kit.json'
+        destination_repo: 'SEU_USUARIO_AQUI/casa_curadoria_art' # ⚠️ MUDE PARA O SEU USUÁRIO DO GITHUB
+        destination_folder: '/'
+        user_email: 'casacuradorias@gmail.com'
+        user_name: 'CasaCuradoria-Bot'
+        commit_message: '🤖 Auto-update: Métricas mensais do Mídia Kit atualizadas'
